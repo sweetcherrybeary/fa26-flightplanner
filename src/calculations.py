@@ -1,125 +1,113 @@
-def calculate_pressure_altitude(altimeter_setting, field_elevation):
+def calculate_pressure_altitude(altimeter_setting, field_elevation_in_ft):
     """
     Calculate the pressure altitude.
 
     Parameters:
     altimeter_setting (float): The current altimeter setting in inches of mercury (inHg).
-    field_elevation (float): The elevation of the airfield in feet.
+    field_elevation_in_ft (float): The elevation of the airfield in feet.
 
     Returns:
     float: The pressure altitude in feet.
     """
+    if altimeter_setting < 28.00 or altimeter_setting > 31.00:
+        raise ValueError("Altimeter setting out of range (28.00-31.00 inHg)")
 
-    return field_elevation + (29.92 - altimeter_setting) * 1000
+    return field_elevation_in_ft + (29.92 - altimeter_setting) * 1000
 
-def calculate_density_altitude(temperature, field_elevation, altimeter_setting):
+def calculate_density_altitude(temperature_in_c, field_elevation_in_ft, altimeter_setting):
     """
     Calculate the density altitude.
 
     Parameters:
-    temperature (float): The outside air temperature in degrees Celsius.
-    field_elevation (float): The elevation of the airfield in feet.
+    temperature_in_c (float): The outside air temperature in degrees Celsius.
+    field_elevation_in_ft (float): The elevation of the airfield in feet.
     altimeter_setting (float): The current altimeter setting in inches of mercury (inHg).
     
     Returns:
     float: The density altitude in feet.
     """ 
 
-    pressure_altitude = calculate_pressure_altitude(altimeter_setting, field_elevation)
-    ISA_temperature = 15 - (pressure_altitude / 1000) * 2
-    return pressure_altitude + (120 * (temperature - ISA_temperature))
+    sea_base_line = 15
+    lapse_rate = 2
 
-def calculate_rate_of_climb(temperature, field_elevation, altimeter_setting):
+    pressure_altitude = calculate_pressure_altitude(altimeter_setting, field_elevation_in_ft)
+    ISA_temperature = sea_base_line - (pressure_altitude / 1000) * lapse_rate
+    
+    return pressure_altitude + (120 * (temperature_in_c - ISA_temperature))
+
+def calculate_rate_of_climb(density_altitude):
     """
     Calculate the rate of climb based on the density altitude from the piper cherokee chart.
 
     Parameters:
-    temperature (float): The outside air temperature in degrees Celsius.
-    field_elevation (float): The elevation of the airfield in feet.
-    altimeter_setting (float): The current altimeter setting in inches of mercury (inHg).
+    density_altitude (float): The density altitude in feet.
 
     Returns:
     float: The rate of climb in feet per minute.
     """
-
     slope = 25
-    density_altitude = calculate_density_altitude(temperature, field_elevation, altimeter_setting)
-    return (16500-density_altitude)/slope
+    y_intercept = 16500
+    
+    return (y_intercept-density_altitude)/slope
 
-def calculate_true_air_speed(temperature, field_elevation, altimeter_setting, power_setting):
+def calculate_true_air_speed(density_altitude, power_setting):
     """
     Calculate the true air speed based on the density altitude and power setting.
 
     Parameters:
-    temperature (float): The outside air temperature in degrees Celsius.
-    field_elevation (float): The elevation of the airfield in feet.
-    altimeter_setting (float): The current altimeter setting in inches of mercury (inHg).
+    density_altitude (float): The density altitude in feet.
     power_setting (float): The power setting as a percentage.
 
     Returns:
     float: The calculated true air speed in miles per hour (mph).
     """
     if power_setting < 50 or power_setting > 75:
-        return "Power setting out of range (50-75)"
+        raise Exception("Power setting out of range (50-75)")
     
-    density_altitude = calculate_density_altitude(temperature, field_elevation, altimeter_setting)
     y_intercept = 45.653
     mph_per_density_altitude = 0.0008722
-    mph_per_percent_power = 1.0430
+    mph_per_percent_power = 1.0430 
+
     return y_intercept + mph_per_density_altitude * density_altitude + mph_per_percent_power * power_setting
 
-def calculate_landing_distance(temperature, field_elevation, altimeter_setting, ground_roll, over_50_feet_obstacle):
+def calculate_landing_distance(density_altitude):
     """
     Calculate the landing distance based on the density altitude and the type of landing.
 
     Parameters:
-    temperature (float): The outside air temperature in degrees Celsius.
-    field_elevation (float): The elevation of the airfield in feet.
-    altimeter_setting (float): The current altimeter setting in inches of mercury (inHg).
-    ground_roll (bool): Whether to calculate the ground roll distance.
-    over_50_feet_obstacle (bool): Whether to calculate the distance to clear a 50-feet obstacle.
+    density_altitude (float): The density altitude in feet.
 
     Returns:
-    float or str: The calculated landing distance in feet, or an error message if both or neither options are selected.
+    ground_roll (float): The calculated ground roll distance in feet.
+    over_50_feet_obstacle (float): The calculated distance to clear a 50-feet obstacle in feet.
     """
 
-    density_altitude = calculate_density_altitude(temperature, field_elevation, altimeter_setting)
-    if ground_roll and over_50_feet_obstacle:
-        return "Cannot have both enabled"
-    if ground_roll:
-        y_intercept = 37500
-        slope = 70
-        return (density_altitude/slope) + (y_intercept/slope)
-    if over_50_feet_obstacle:
-        y_intercept = 43000
-        slope = 40
-        return (density_altitude/slope) + (y_intercept/slope)
-    return "No option selected"
+    y_intercept_ground_roll = 37500
+    slope_ground_roll = 70
+    y_intercept_over_50_feet_obstacle = 43000
+    slope_over_50_feet_obstacle = 40
 
-def calculate_takeoff_distance(temperature, field_elevation, altimeter_setting, ground_run, over_50_feet_obstacle):
+    ground_roll = (density_altitude/slope_ground_roll) + (y_intercept_ground_roll/slope_ground_roll)
+    over_50_feet_obstacle = (density_altitude/slope_over_50_feet_obstacle) + (y_intercept_over_50_feet_obstacle/slope_over_50_feet_obstacle)
+
+    return ground_roll, over_50_feet_obstacle
+
+def calculate_takeoff_distance(density_altitude):
     """
     Calculate the takeoff distance based on the density altitude and the type of takeoff.
 
     Parameters:
-    temperature (float): The outside air temperature in degrees Celsius.
-    field_elevation (float): The elevation of the airfield in feet.
-    altimeter_setting (float): The current altimeter setting in inches of mercury (inHg).
-    ground_run (bool): Whether to calculate the ground roll distance.
-    over_50_feet_obstacle (bool): Whether to calculate the distance to clear a 50-feet obstacle.
+    density_altitude (float): The density altitude in feet.
 
     Returns:
     float or str: The calculated takeoff distance in feet, or an error message if both or neither options are selected.
     """
+    slope_ground_run = 14
+    y_intercept_ground_run = 11000
+    slope_over_50_feet_obstacle = 6
+    y_intercept_over_50_feet_obstacle = 10000
 
-    density_altitude = calculate_density_altitude(temperature, field_elevation, altimeter_setting)
-    if ground_run and over_50_feet_obstacle:
-        return "Cannot have both enabled"
-    if ground_run:
-        slope = 14
-        y_intercept = 11000
-        return (density_altitude/slope) + (y_intercept/slope)
-    if over_50_feet_obstacle:
-        slope = 6
-        y_intercept = 10000
-        return (density_altitude/slope) + (y_intercept/slope)
-    return "No option selected"
+    ground_run = (density_altitude/slope_ground_run) + (y_intercept_ground_run/slope_ground_run)
+    over_50_feet_obstacle =(density_altitude/slope_over_50_feet_obstacle) + (y_intercept_over_50_feet_obstacle/slope_over_50_feet_obstacle)
+
+    return ground_run, over_50_feet_obstacle
